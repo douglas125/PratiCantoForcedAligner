@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.tfrecords
+checkpoints/
 
 # C extensions
 *.so
