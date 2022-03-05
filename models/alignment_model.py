@@ -71,7 +71,8 @@ class PraticantoForcedAligner:
 
         # predict alignments
         char_align = L.Dot([2, 2])([char_enc, spec_enc])
-        char_align = L.Activation('sigmoid')(char_align)
+        # char_align = L.Activation('sigmoid', name='output')(char_align)
+        char_align = tf.keras.activations.softmax(char_align, axis=-1)
 
         # postprocessing: figure out the region of each char in
         # (batch_size, n_chars, n_mels)
