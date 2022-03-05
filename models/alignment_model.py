@@ -45,6 +45,7 @@ class PraticantoForcedAligner:
     def __init__(
         self, sampling_rate, vocab, n_mels=80,
         emb_size=16, rnn_cells=128, proj_dim=256,
+        frame_length=1024, frame_step=256,
     ):
         # char encoder parameters
         self.vocab = vocab
@@ -55,10 +56,13 @@ class PraticantoForcedAligner:
         # mel-spectrogram parameters
         self.n_mels = n_mels
         self.sampling_rate = sampling_rate
+        self.frame_length = frame_length
+        self.frame_step = frame_step
 
     def build_models(self):
         self.MelSpectrogram = get_melspec_model(
-            sample_rate=self.sampling_rate, num_mel_bins=self.n_mels
+            sample_rate=self.sampling_rate, num_mel_bins=self.n_mels,
+            frame_length=self.frame_length, frame_step=self.frame_step
         )
         self.model_char_enc = self.char_seq_encoder()
         self.model_melspec_enc = self.melspec_encoder()
