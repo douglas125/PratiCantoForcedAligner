@@ -76,7 +76,7 @@ class PraticantoForcedAligner:
         # predict alignments
         char_align = L.Dot([2, 2])([char_enc, spec_enc])
         # char_align = L.Activation('sigmoid', name='output')(char_align)
-        char_align = tf.keras.activations.softmax(char_align, axis=-1)
+        char_align = tf.keras.activations.softmax(char_align, axis=1)
 
         # postprocessing: figure out the region of each char in
         # (batch_size, n_chars, n_mels)
@@ -99,22 +99,30 @@ class PraticantoForcedAligner:
         inp = L.Input((None,), dtype=tf.string)
         x = self.char_table(inp)
         x = L.Embedding(self.char_table.vocabulary_size(), self.emb_size)(x)
+        emb_x = x
 
         # encoding
         x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
         x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
+        x = L.Concatenate()([emb_x, x])
         x = L.Dense(self.proj_dim)(x)
         return Model(inputs=inp, outputs=x, name='char_encoder')
 
     def melspec_encoder(self):
         # shape is (batch_size, seq_len, n_mels)
         inp = L.Input((None, self.n_mels))
+        x = inp
 
-        # TODO: check if there are preliminary dense layers here
+        # TODO: check the need for preliminary dense layers here
+        x = L.Dense(self.rnn_cells * 2, activation='relu')(x)
+        xbkp = x
+        x = L.Dense(self.rnn_cells * 2, activation='relu')(x)
+        x = L.Dense(self.rnn_cells * 2, activation='relu')(x)
+        x = L.Add()([xbkp, x])
 
         # encoding
-        x = inp
         x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
-        x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
+        # x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
+        x = L.Add()([xbkp, x])
         x = L.Dense(self.proj_dim)(x)
         return Model(inputs=inp, outputs=x, name='mel_encoder')
