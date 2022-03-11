@@ -3,7 +3,12 @@ import tensorflow as tf
 
 binary_crossentropy = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
 
-possible_losses = ['all', 'order_loss', 'coverage_loss', 'pred_max', 'pred_min', 'length_loss']
+possible_losses = [
+    'all', 'order_loss', 'coverage_loss', 'pred_max',
+    'pred_min', 'length_loss', 'one_region_loss'
+]
+
+
 def create_mask(x):
     """ Creates a mask that is 1 in unpadded shape and zero elsewhere
     e.g.
@@ -93,8 +98,21 @@ def alignment_loss(loss_to_return='all'):
         """
 
         # we don't want anyone predicting a very long length
-        length_loss = tf.square(pred_sum)
-        length_loss = tf.reduce_sum(tf.squeeze(length_loss, axis=-1), axis=-1)
+        # each spectrogram step lasts ~10ms and smallest sound is ~70ms
+        length_loss = tf.math.maximum(tf.abs(pred_sum) - 7.0, 0.0)
+        length_loss = tf.reduce_mean(tf.squeeze(length_loss, axis=-1), axis=-1)
+
+        # we don't want the same char spiking at
+        # 2 different points in the spectrogram
+        # rationale: if it goes from 0 to 1 back to 0, the derivative
+        # ends up being 2. Anything bigger is not good
+        one_region_loss = y_pred[:, :, 1:] - y_pred[:, :, :-1]
+        one_region_loss = tf.abs(one_region_loss)
+        # with the sum, if the pred goes 0 -> 1 -> 0,
+        # the shift sums to exactly 2
+        one_region_loss = tf.reduce_sum(one_region_loss, axis=2)
+        one_region_loss = tf.square(tf.math.maximum(one_region_loss - 2.0, 0.0))
+        one_region_loss = tf.reduce_mean(one_region_loss, axis=-1)
 
         # though there's a softmax, we still want someone to actually predict 1
         coverage_pred = tf.reduce_max(y_pred, axis=1)  # shape is (batch_size, n_mel_specs)
@@ -114,13 +132,14 @@ def alignment_loss(loss_to_return='all'):
         # pred_max = tf.reduce_sum(pred_max * pred_mask, axis=-1)
         pred_max = binary_crossentropy(pred_mask, pred_max * pred_mask)
 
-        order_loss = 0.01 * order_loss
-        coverage_loss = 1 * coverage_loss
-        pred_max = 0.2 * pred_max
-        pred_min = 0.2 * pred_min
-        length_loss = 1e-5 * length_loss
+        order_loss = 1 * order_loss
+        coverage_loss = 0.1 * coverage_loss
+        pred_max = 1.0 * pred_max
+        pred_min = 0.25 * pred_min
+        length_loss = 0.1 * length_loss
+        one_region_loss = 1.1 * one_region_loss
         if loss_to_return == 'all':
-            return order_loss + coverage_loss + pred_max + pred_min + length_loss
+            return order_loss + coverage_loss + pred_max + pred_min + length_loss + one_region_loss
         elif loss_to_return == 'order_loss':
             return order_loss
         elif loss_to_return == 'coverage_loss':
@@ -131,5 +150,8 @@ def alignment_loss(loss_to_return='all'):
             return pred_min
         elif loss_to_return == 'length_loss':        
             return length_loss
+        elif loss_to_return == 'one_region_loss':
+            return one_region_loss
+
     alignment_loss_fn.__name__ = f'AlignmentLoss_{loss_to_return}'
     return alignment_loss_fn

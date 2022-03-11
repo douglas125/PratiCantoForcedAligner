@@ -44,7 +44,7 @@ def get_melspec_model(
 class PraticantoForcedAligner:
     def __init__(
         self, sampling_rate, vocab, n_mels=80,
-        emb_size=16, rnn_cells=128, proj_dim=256,
+        emb_size=16 + 4, rnn_cells=128 + 32, proj_dim=256 + 32,
         frame_length=1024, frame_step=256,
     ):
         # char encoder parameters
