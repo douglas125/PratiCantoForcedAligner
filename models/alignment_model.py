@@ -7,45 +7,59 @@ def get_spectrogram_model(n_samples=None, n_fft=1024):
     inp = L.Input((n_samples,))
 
     # A 1024-point STFT with frames of 64 ms and 75% overlap.
-    stfts = tf.signal.stft(inp, frame_length=1024, frame_step=256,
-                           fft_length=n_fft)
+    stfts = tf.signal.stft(inp, frame_length=1024, frame_step=256, fft_length=n_fft)
     spectrograms = tf.abs(stfts)
-    return Model(inputs=inp, outputs=spectrograms, name='spectrogram')
+    return Model(inputs=inp, outputs=spectrograms, name="spectrogram")
 
 
 def get_melspec_model(
-    n_samples=None, n_fft=1024, sample_rate=22050,
-    frame_length=1024, frame_step=256,
-    lower_edge_hertz=60.0, upper_edge_hertz=7700.0, num_mel_bins=80
+    n_samples=None,
+    n_fft=1024,
+    sample_rate=22050,
+    frame_length=1024,
+    frame_step=256,
+    lower_edge_hertz=60.0,
+    upper_edge_hertz=7700.0,
+    num_mel_bins=80,
 ):
     inp = L.Input((n_samples,))
 
-    stfts = tf.signal.stft(inp, frame_length=frame_length, frame_step=frame_step,
-                           fft_length=n_fft)
+    stfts = tf.signal.stft(
+        inp, frame_length=frame_length, frame_step=frame_step, fft_length=n_fft
+    )
     spectrograms = tf.abs(stfts)
 
     # Warp the linear scale spectrograms into the mel-scale.
     num_spectrogram_bins = n_fft // 2 + 1  # stfts.shape[-1].value
 
     linear_to_mel_weight_matrix = tf.signal.linear_to_mel_weight_matrix(
-      num_mel_bins, num_spectrogram_bins, sample_rate, lower_edge_hertz,
-      upper_edge_hertz)
-    mel_spectrograms = tf.tensordot(
-      spectrograms, linear_to_mel_weight_matrix, 1)
-    mel_spectrograms.set_shape(spectrograms.shape[:-1].concatenate(
-      linear_to_mel_weight_matrix.shape[-1:]))
+        num_mel_bins,
+        num_spectrogram_bins,
+        sample_rate,
+        lower_edge_hertz,
+        upper_edge_hertz,
+    )
+    mel_spectrograms = tf.tensordot(spectrograms, linear_to_mel_weight_matrix, 1)
+    mel_spectrograms.set_shape(
+        spectrograms.shape[:-1].concatenate(linear_to_mel_weight_matrix.shape[-1:])
+    )
 
     # Compute a stabilized log to get log-magnitude mel-scale spectrograms.
     log_mel_spectrograms = tf.math.log(mel_spectrograms + 1e-6)
-    return Model(inputs=inp, outputs=log_mel_spectrograms,
-                 name='log_mel_spectrogram')
+    return Model(inputs=inp, outputs=log_mel_spectrograms, name="log_mel_spectrogram")
 
 
 class PraticantoForcedAligner:
     def __init__(
-        self, sampling_rate, vocab, n_mels=80,
-        emb_size=16 + 4, rnn_cells=128 + 32, proj_dim=256 + 32,
-        frame_length=1024, frame_step=256,
+        self,
+        sampling_rate,
+        vocab,
+        n_mels=80,
+        emb_size=16 + 4,
+        rnn_cells=128 + 32,
+        proj_dim=256 + 32,
+        frame_length=1024,
+        frame_step=256,
     ):
         # char encoder parameters
         self.vocab = vocab
@@ -61,14 +75,16 @@ class PraticantoForcedAligner:
 
     def build_models(self):
         self.MelSpectrogram = get_melspec_model(
-            sample_rate=self.sampling_rate, num_mel_bins=self.n_mels,
-            frame_length=self.frame_length, frame_step=self.frame_step
+            sample_rate=self.sampling_rate,
+            num_mel_bins=self.n_mels,
+            frame_length=self.frame_length,
+            frame_step=self.frame_step,
         )
         self.model_char_enc = self.char_seq_encoder()
         self.model_melspec_enc = self.melspec_encoder()
 
-        inp1 = L.Input((None,), name='char_seq', dtype=tf.string)
-        inp2 = L.Input((None,), name='waveform')
+        inp1 = L.Input((None,), name="char_seq", dtype=tf.string)
+        inp2 = L.Input((None,), name="waveform")
         char_enc = self.model_char_enc(inp1)
         spec = self.MelSpectrogram(inp2)
         spec_enc = self.model_melspec_enc(spec)
@@ -95,7 +111,8 @@ class PraticantoForcedAligner:
         # note: vocab should probably include a [PAD] token
         self.char_table = tf.keras.layers.StringLookup(vocabulary=self.vocab)
         self.inv_char_table = tf.keras.layers.StringLookup(
-            vocabulary=self.vocab, invert=True)
+            vocabulary=self.vocab, invert=True
+        )
         inp = L.Input((None,), dtype=tf.string)
         x = self.char_table(inp)
         x = L.Embedding(self.char_table.vocabulary_size(), self.emb_size)(x)
@@ -106,7 +123,7 @@ class PraticantoForcedAligner:
         x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
         x = L.Concatenate()([emb_x, x])
         x = L.Dense(self.proj_dim)(x)
-        return Model(inputs=inp, outputs=x, name='char_encoder')
+        return Model(inputs=inp, outputs=x, name="char_encoder")
 
     def melspec_encoder(self):
         # shape is (batch_size, seq_len, n_mels)
@@ -114,10 +131,10 @@ class PraticantoForcedAligner:
         x = inp
 
         # TODO: check the need for preliminary dense layers here
-        x = L.Dense(self.rnn_cells * 2, activation='relu')(x)
+        x = L.Dense(self.rnn_cells * 2, activation="relu")(x)
         xbkp = x
-        x = L.Dense(self.rnn_cells * 2, activation='relu')(x)
-        x = L.Dense(self.rnn_cells * 2, activation='relu')(x)
+        x = L.Dense(self.rnn_cells * 2, activation="relu")(x)
+        x = L.Dense(self.rnn_cells * 2, activation="relu")(x)
         x = L.Add()([xbkp, x])
 
         # encoding
@@ -125,4 +142,4 @@ class PraticantoForcedAligner:
         # x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
         x = L.Add()([xbkp, x])
         x = L.Dense(self.proj_dim)(x)
-        return Model(inputs=inp, outputs=x, name='mel_encoder')
+        return Model(inputs=inp, outputs=x, name="mel_encoder")

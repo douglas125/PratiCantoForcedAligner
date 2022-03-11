@@ -1,16 +1,23 @@
 import tensorflow as tf
 
 
-binary_crossentropy = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
+binary_crossentropy = tf.keras.losses.BinaryCrossentropy(
+    reduction=tf.keras.losses.Reduction.NONE
+)
 
 possible_losses = [
-    'all', 'order_loss', 'coverage_loss', 'pred_max',
-    'pred_min', 'length_loss', 'one_region_loss'
+    "all",
+    "order_loss",
+    "coverage_loss",
+    "pred_max",
+    "pred_min",
+    "length_loss",
+    "one_region_loss",
 ]
 
 
 def create_mask(x):
-    """ Creates a mask that is 1 in unpadded shape and zero elsewhere
+    """Creates a mask that is 1 in unpadded shape and zero elsewhere
     e.g.
     1 1 1 1 1 1 0 0 0 0
     1 1 1 1 1 1 0 0 0 0
@@ -22,17 +29,18 @@ def create_mask(x):
     unpadded_shape = x[0:2]
     padded_shape = x[2:4]
     vec = tf.ones(unpadded_shape, dtype=tf.float32)
-    pad_shape = tf.stack([
-        tf.zeros((2,), dtype=tf.int32),
-        padded_shape - unpadded_shape
-    ], axis=1)
+    pad_shape = tf.stack(
+        [tf.zeros((2,), dtype=tf.int32), padded_shape - unpadded_shape], axis=1
+    )
     vec = tf.pad(vec, pad_shape)
     return vec
 
-def alignment_loss(loss_to_return='all'):
+
+def alignment_loss(loss_to_return="all"):
     assert loss_to_return in possible_losses
+
     def alignment_loss_fn(y_true, y_pred):
-        """ Alignment loss
+        """Alignment loss
 
         This method is exclusively self supervised
 
@@ -49,19 +57,23 @@ def alignment_loss(loss_to_return='all'):
         """
         # create masks to filter losses
         y_true = tf.cast(y_true, tf.int32)
-        shapes = tf.concat([
-            y_true,
-            tf.tile(
-                tf.expand_dims(tf.shape(y_pred)[1:3], axis=0),
-                [tf.shape(y_true)[0], 1]
-            )
-        ], axis=1)
+        shapes = tf.concat(
+            [
+                y_true,
+                tf.tile(
+                    tf.expand_dims(tf.shape(y_pred)[1:3], axis=0),
+                    [tf.shape(y_true)[0], 1],
+                ),
+            ],
+            axis=1,
+        )
 
         masks = tf.map_fn(
-            create_mask, shapes,
+            create_mask,
+            shapes,
             # tensorflow doesn't understand why the input is int
             # but the output is float
-            fn_output_signature=tf.TensorSpec([None, None], dtype=tf.float32)
+            fn_output_signature=tf.TensorSpec([None, None], dtype=tf.float32),
         )
 
         # apply mask to pred
@@ -70,9 +82,7 @@ def alignment_loss(loss_to_return='all'):
 
         # force chars to be predicted in order
         pred_sum = tf.reduce_sum(y_pred, axis=2, keepdims=True)
-        cum_pred = tf.cumsum(
-            y_pred, axis=2
-        ) / (pred_sum + 1e-6)
+        cum_pred = tf.cumsum(y_pred, axis=2) / (pred_sum + 1e-6)
         # apply masks - not needed since diff = 0 in the masked elements
         # because pred is masked
         # >cum_pred = cum_pred * masks< <- not needed
@@ -115,7 +125,9 @@ def alignment_loss(loss_to_return='all'):
         one_region_loss = tf.reduce_mean(one_region_loss, axis=-1)
 
         # though there's a softmax, we still want someone to actually predict 1
-        coverage_pred = tf.reduce_max(y_pred, axis=1)  # shape is (batch_size, n_mel_specs)
+        coverage_pred = tf.reduce_max(
+            y_pred, axis=1
+        )  # shape is (batch_size, n_mel_specs)
         coverage_mask = tf.reduce_max(masks, axis=1)
         coverage_loss = binary_crossentropy(coverage_mask, coverage_pred)
         # print(coverage_mask, coverage_pred)
@@ -138,20 +150,27 @@ def alignment_loss(loss_to_return='all'):
         pred_min = 0.25 * pred_min
         length_loss = 0.1 * length_loss
         one_region_loss = 1.1 * one_region_loss
-        if loss_to_return == 'all':
-            return order_loss + coverage_loss + pred_max + pred_min + length_loss + one_region_loss
-        elif loss_to_return == 'order_loss':
+        if loss_to_return == "all":
+            return (
+                order_loss
+                + coverage_loss
+                + pred_max
+                + pred_min
+                + length_loss
+                + one_region_loss
+            )
+        elif loss_to_return == "order_loss":
             return order_loss
-        elif loss_to_return == 'coverage_loss':
+        elif loss_to_return == "coverage_loss":
             return coverage_loss
-        elif loss_to_return == 'pred_max':
+        elif loss_to_return == "pred_max":
             return pred_max
-        elif loss_to_return == 'pred_min':
+        elif loss_to_return == "pred_min":
             return pred_min
-        elif loss_to_return == 'length_loss':        
+        elif loss_to_return == "length_loss":
             return length_loss
-        elif loss_to_return == 'one_region_loss':
+        elif loss_to_return == "one_region_loss":
             return one_region_loss
 
-    alignment_loss_fn.__name__ = f'AlignmentLoss_{loss_to_return}'
+    alignment_loss_fn.__name__ = f"AlignmentLoss_{loss_to_return}"
     return alignment_loss_fn

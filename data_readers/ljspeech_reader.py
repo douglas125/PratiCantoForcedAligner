@@ -6,31 +6,42 @@ from tqdm.auto import tqdm
 
 
 class LJSpeechReader:
-    """ Helper class to retrieve LJSpeech audios and transcriptions
-    """
+    """Helper class to retrieve LJSpeech audios and transcriptions"""
 
     def __init__(self, ljspeech_folder):
         self.ljspeech_folder = ljspeech_folder
-        self.df_audios = pd.read_csv(os.path.join(
-            ljspeech_folder, 'metadata.csv'
-        ), header=None, sep='|', names=[
-            'ID', 'Original_text', 'Normalized_text'
-        ])
+        self.df_audios = pd.read_csv(
+            os.path.join(ljspeech_folder, "metadata.csv"),
+            header=None,
+            sep="|",
+            names=["ID", "Original_text", "Normalized_text"],
+        )
 
         # build vocabulary
-        self.tokens = list(set(' '.join(
-            [str(x).lower() for x in self.df_audios.Normalized_text.tolist()]
-        )))
-        self.tokens = sorted(self.tokens) + ['[BOS]', '[EOS]', '[PAD]']
+        self.tokens = list(
+            set(
+                " ".join(
+                    [str(x).lower() for x in self.df_audios.Normalized_text.tolist()]
+                )
+            )
+        )
+        self.tokens = sorted(self.tokens) + ["[BOS]", "[EOS]", "[PAD]"]
 
         # build lookup layers
         self.lookup = tf.keras.layers.StringLookup(
-            max_tokens=None, num_oov_indices=1, mask_token=None,
-            oov_token='[UNK]', vocabulary=self.tokens
+            max_tokens=None,
+            num_oov_indices=1,
+            mask_token=None,
+            oov_token="[UNK]",
+            vocabulary=self.tokens,
         )
         self.lookup_inv = tf.keras.layers.StringLookup(
-            max_tokens=None, num_oov_indices=1, mask_token=None,
-            oov_token='[UNK]', vocabulary=self.tokens, invert=True
+            max_tokens=None,
+            num_oov_indices=1,
+            mask_token=None,
+            oov_token="[UNK]",
+            vocabulary=self.tokens,
+            invert=True,
         )
 
     def generate_audios(self, max_audios=None):
@@ -38,8 +49,7 @@ class LJSpeechReader:
             if max_audios is not None and idx > max_audios:
                 break
 
-            file_name = os.path.join(self.ljspeech_folder, 'wavs',
-                                     row.ID + '.wav')
+            file_name = os.path.join(self.ljspeech_folder, "wavs", row.ID + ".wav")
             file_contents = tf.io.read_file(file_name)
             audio, sr = tf.audio.decode_wav(file_contents)
 
