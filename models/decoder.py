@@ -36,7 +36,7 @@ class PFADecoder:
         elif i < 0 or j < 0:
             return self.bigM
 
-        if self.accum_score[i, j] < 0:
+        if self.accum_score[i, j] == -1.0:
             same_row_score = self._decode_accum_scores(m, i, j - 1) + m[i, j]
             switch_row_score = self._decode_accum_scores(m, i - 1, j - 1) + m[i, j]
             if same_row_score > switch_row_score:
