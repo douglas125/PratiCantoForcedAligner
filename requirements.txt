@@ -2,3 +2,4 @@ tqdm
 pandas
 numpy==1.22
 tensorflow==2.8.0
+tensorflow-io==0.24.0
