@@ -60,6 +60,12 @@ class PraticantoForcedAligner:
         proj_dim=256 + 32,
         frame_length=1024,
         frame_step=256,
+        # if using CNN instead of RNN
+        use_cnn=False,
+        cnn_filters=96,
+        cnn_num_convs=4,
+        kernel_size_spec=9,
+        kernel_size_char=5,
     ):
         # char encoder parameters
         self.vocab = vocab
@@ -72,6 +78,13 @@ class PraticantoForcedAligner:
         self.sampling_rate = sampling_rate
         self.frame_length = frame_length
         self.frame_step = frame_step
+
+        # CNN parameters
+        self.use_cnn = use_cnn
+        self.cnn_filters = cnn_filters
+        self.kernel_size_char = kernel_size_char
+        self.kernel_size_spec = kernel_size_spec
+        self.cnn_num_convs = cnn_num_convs
 
     def build_models(self):
         self.MelSpectrogram = get_melspec_model(
@@ -119,8 +132,26 @@ class PraticantoForcedAligner:
         emb_x = x
 
         # encoding
-        x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
-        x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
+        if self.use_cnn:
+            # x shape is (batch_size, n_chars, emb_size)
+            x = L.Conv1D(
+                filters=self.cnn_filters,
+                kernel_size=self.kernel_size_char,
+                padding="same",
+            )(x)
+            for k in range(2 * self.cnn_num_convs):
+                xbkp = x
+                x = L.Conv1D(
+                    filters=self.cnn_filters,
+                    kernel_size=self.kernel_size_char,
+                    padding="same",
+                )(x)
+                x = L.BatchNormalization()(x)
+                x = L.Activation("relu")(x)
+                x = L.Add()([x, xbkp])
+        else:
+            x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
+            x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
         x = L.Concatenate()([emb_x, x])
         x = L.Dense(self.proj_dim)(x)
         return Model(inputs=inp, outputs=x, name="char_encoder")
@@ -138,8 +169,26 @@ class PraticantoForcedAligner:
         x = L.Add()([xbkp, x])
 
         # encoding
-        x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
-        # x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
-        x = L.Add()([xbkp, x])
+        if self.use_cnn:
+            x = L.Conv1D(
+                filters=self.cnn_filters,
+                kernel_size=self.kernel_size_spec,
+                padding="same",
+            )(x)
+            for k in range(self.cnn_num_convs):
+                xbkp = x
+                x = L.Conv1D(
+                    filters=self.cnn_filters,
+                    kernel_size=self.kernel_size_spec,
+                    padding="same",
+                )(x)
+                x = L.BatchNormalization()(x)
+                x = L.Activation("relu")(x)
+                x = L.Add()([x, xbkp])
+            x = L.Concatenate()([xbkp, x])
+        else:
+            x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
+            # x = L.Bidirectional(L.LSTM(self.rnn_cells, return_sequences=True))(x)
+            x = L.Add()([xbkp, x])
         x = L.Dense(self.proj_dim)(x)
         return Model(inputs=inp, outputs=x, name="mel_encoder")
