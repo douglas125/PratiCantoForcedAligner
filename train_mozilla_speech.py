@@ -68,7 +68,7 @@ def main():
 
     def prep_inputs(cur_audio, sentence, age, gender):
         cur_txt = tf.ensure_shape(sentence, ())
-        cur_txt = tf.strings.bytes_split(cur_txt)
+        cur_txt = tf.strings.unicode_split(cur_txt, "UTF-8")
         cur_txt = tf.concat([["[BOS]"], cur_txt, ["[EOS]"]], axis=0)
 
         shapes = tf.concat(
@@ -148,9 +148,9 @@ def main():
             lr_callback,
             chkpt_callback,
             tensorboard_callback,
-            TqdmCallback(verbose=2),
+            # TqdmCallback(verbose=2),
         ],
-        verbose=0,
+        # verbose=0,
     )
 
 
