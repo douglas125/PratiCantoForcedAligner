@@ -148,7 +148,7 @@ def alignment_loss(loss_to_return="all"):
         coverage_loss = 0.3 * coverage_loss
         pred_max = 0.5 * pred_max
         pred_min = 0.1 * pred_min
-        length_loss = 0.2 * length_loss
+        length_loss = 0.3 * length_loss
         one_region_loss = 1.1 * one_region_loss
         if loss_to_return == "all":
             return (
