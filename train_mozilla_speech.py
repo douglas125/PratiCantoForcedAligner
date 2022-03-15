@@ -18,9 +18,9 @@ def prep_batch_inputs(cur_txt, cur_audio, seq_lengths):
 
 
 def scheduler(epoch, lr):
-    if epoch <= 50:
+    if epoch <= 100:
         return 1e-3
-    elif epoch <= 150:
+    elif epoch <= 200:
         return 1e-4
     else:
         return 2e-5

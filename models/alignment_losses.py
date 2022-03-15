@@ -145,8 +145,8 @@ def alignment_loss(loss_to_return="all"):
         pred_max = binary_crossentropy(pred_mask, pred_max * pred_mask)
 
         order_loss = 1.1 * order_loss
-        coverage_loss = 0.3 * coverage_loss
-        pred_max = 0.5 * pred_max
+        coverage_loss = 0.5 * coverage_loss
+        pred_max = 0.8 * pred_max
         pred_min = 0.1 * pred_min
         length_loss = 0.3 * length_loss
         one_region_loss = 1.1 * one_region_loss
