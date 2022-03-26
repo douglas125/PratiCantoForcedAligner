@@ -18,12 +18,16 @@ def prep_batch_inputs(cur_txt, cur_audio, seq_lengths):
 
 
 def scheduler(epoch, lr):
-    if epoch <= 100:
-        return 1e-3
-    elif epoch <= 200:
+    if epoch <= 1:
         return 1e-4
-    else:
+    elif epoch <= 60:
+        return 1e-3
+    elif epoch <= 120:
+        return 1e-4
+    elif epoch <= 180:
         return 2e-5
+    else:
+        return 1e-5
 
 
 def main():
@@ -42,6 +46,13 @@ def main():
         type=str,
         default="rnn",
         help="Architecture: `rnn` or `cnn`",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        "-c",
+        type=str,
+        default="",
+        help="Checkpoint to load",
     )
     args = parser.parse_args()
     print(args)
@@ -114,6 +125,11 @@ def main():
         loss=model_losses[0],
         metrics=model_losses[1:],
     )
+    if os.path.isfile(args.checkpoint + ".index"):
+        print(f"Loading weights from {args.checkpoint}")
+        alignment_model.load_weights(args.checkpoint)
+    else:
+        print(f"Start training from scratch")
 
     # callbacks
     os.makedirs("checkpoints", exist_ok=True)
@@ -148,9 +164,9 @@ def main():
             lr_callback,
             chkpt_callback,
             tensorboard_callback,
-            # TqdmCallback(verbose=2),
+            TqdmCallback(verbose=2),
         ],
-        # verbose=0,
+        verbose=0,
     )
 
 
