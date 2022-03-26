@@ -1,0 +1,15 @@
+name: tf2speech
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - jupyterlab
+  - jupyterlab-lsp
+  - numpy
+  - python-lsp-server
+  - pandas
+  - tqdm
+  - ipywidgets
+  - pip:
+    - tensorflow==2.8.0
+    - tensorflow-io==0.24.0
